@@ -52,9 +52,9 @@ imagesc(test_image)
 % convert to gray level
 test_image_gray = rgb2gray(test_image);
 % panels are contained within white regions, those above ~240 in all RGB channels
-panel_regions =imopen(((sum(test_image,3)/3)<240),ones(3));
-figure(2)
-imagesc(panel_regions)
+panel_regions =imopen(((sum(test_image,3)/3)<242),ones(3));
+%figure(2)
+%imagesc(panel_regions)
 %
 % now remove the details of the labels to get individual panels
 [panel_regions_L,numRegions] = bwlabel(panel_regions);
@@ -76,19 +76,26 @@ end
 % the erosion is important to remove edges
 %[panel_individual,numPanels] = bwlabel(imerode(panel_regions_large2,ones(16))) ;
 [panel_individual,numPanels] = bwlabel(panel_regions_large2) ;
-imagesc(panel_individual+panel_regions)
-%%
+%imagesc(panel_individual+panel_regions)
+%
 % test image to be examined, use edges as this reveals better the overlaps
 edges_panels = edge(test_image_gray,'canny',[],2).*(panel_individual>0);
-imagesc(edges_panels)
+figure(2)
+imagesc(panel_individual.*(1-edges_panels))
 % Get the bounding boxes
-panel_boundingBox = regionprops(panel_individual,'BoundingBox');
-boxes             = reshape([panel_boundingBox.BoundingBox],4,numPanels)';
-minBoxes          = min(boxes);
+panel_boundingBox   = regionprops(panel_individual,'BoundingBox');
+boxes               = reshape([panel_boundingBox.BoundingBox],4,numPanels)';
+minBoxes            = min(boxes);
+[y1,x1]             = hist(round(boxes(:,2)/5),20);
+numColsPanels       = max(y1);
+[y1,x1]             = hist(round(boxes(:,1)/5),20);
+numRowsPanels       = max(y1);
+
+
 % clear for previous runs
 clear cross_corr_panels new_image
 new_image(rows,cols,numPanels)=0;
-%% Obtain the cross correlation of all panels
+% Obtain the cross correlation of all panels
 % there may be a better way to run this but for the time it works
 for counter1=1:numPanels
     coords_1 = ceil(panel_boundingBox(counter1).BoundingBox);
@@ -107,7 +114,7 @@ for counter1=1:numPanels
     end
 end
 % % individual matches can be visualised
-% figure(1)
+% figure(11)
 % subplot(131)
 % imagesc(edges_panels(rows_1,cols_1));
 % subplot(132)
@@ -118,51 +125,58 @@ end
 %     axis ij
 % 
 %     axis tight
-%% display as a montage of all correlations
+% display as a montage of all correlations
 
-pos1=reshape([1:28],4,7);
-pos2=reshape([1:28],7,4)';
-
-figure(9)
-for kk=1:numPanels
-    disp(kk)
-    h{kk}=subplot(4,7, pos2(kk));
-    %kk=21;
-    mesh((new_image(:,:,kk)/max(max(new_image(:,:,kk))))  );
-    axis ij
-    axis off
-    axis tight
-end
-    colormap hot
-%% Change dimensions for better visualisation
-for kk=1:numPanels
-    %h{kk}.Position(1)=h{kk}.Position(1)+0.02;
-    %h{kk}.Position(2)=h{kk}.Position(2)-0.02;
-    h{kk}.Position(3)=0.09;
-    h{kk}.Position(4)=0.19;
-    %h{kk}.Visible='on';
-    %h{kk}.Color='k';
-end
+%pos1=reshape([1:28],4,7);
+% pos2=reshape(1:numPanels,numCols,numRows)';
+% 
+% figure(9)
+% for kk=1:numPanels
+%     disp(kk)
+%     h{kk}=subplot(4,7, pos2(kk));
+%     %kk=21;
+%     mesh((new_image(:,:,kk)/max(max(new_image(:,:,kk))))  );
+%     axis ij
+%     axis off
+%     axis tight
+% end
+%     colormap hot
+% Change dimensions for better visualisation
+% for kk=1:numPanels
+%     %h{kk}.Position(1)=h{kk}.Position(1)+0.02;
+%     %h{kk}.Position(2)=h{kk}.Position(2)-0.02;
+%     h{kk}.Position(3)=0.09;
+%     h{kk}.Position(4)=0.19;
+%     %h{kk}.Visible='on';
+%     %h{kk}.Color='k';
+% end
     
     
-%% Display results as plots that show the cross correlation between panels
+% Display results as plots that show the cross correlation between panels
 figure(9)
 clf
+pos2=reshape(1:numPanels,numColsPanels,numRowsPanels)';
 for kk=1:numPanels
     disp(kk)
     currentPanelData        = cross_corr_panels(:,:,kk,:);
     currentPanelPeaks       = squeeze(max(max(currentPanelData)));
     currentPanelMainPeak    = currentPanelPeaks(kk);
     currentPanelOtherPeaks  = currentPanelPeaks(setdiff(1:numPanels,kk));
-    meanOtherPeaks          = mean(currentPanelOtherPeaks);
-    stdOtherPeaks           = std(currentPanelOtherPeaks);
-    upperLimit              = meanOtherPeaks+3*stdOtherPeaks;
+    secondMaxRemoved        = currentPanelOtherPeaks(currentPanelOtherPeaks~=max(currentPanelOtherPeaks));
+    meanOtherPeaks          = mean(secondMaxRemoved);
+    stdOtherPeaks           = std(secondMaxRemoved);
+    upperLimit              = meanOtherPeaks+3*stdOtherPeaks+1;
+%     meanOtherPeaks          = mean(currentPanelOtherPeaks);
+%     stdOtherPeaks           = std(currentPanelOtherPeaks);
+%     upperLimit              = meanOtherPeaks+3*stdOtherPeaks;
+    
+    
     peaksAboveUpper         = find(currentPanelPeaks>upperLimit);
     
     peaksAboveUpper_L       = find(currentPanelPeaks>upperLimit);
     peaksAboveUpper_V       = currentPanelPeaks(peaksAboveUpper_L);
     
-    h{kk}=subplot(4,7, pos2(kk));
+    h{kk}=subplot(numRowsPanels,numColsPanels, pos2(kk));
     %kk=21;
     
     plot(1:numPanels,currentPanelPeaks,'k',kk,currentPanelMainPeak,'b*',[1 numPanels],[upperLimit upperLimit],'r:',peaksAboveUpper_L,peaksAboveUpper_V,'dm')
